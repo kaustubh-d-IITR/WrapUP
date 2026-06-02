@@ -1,10 +1,12 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { Calendar, Cloud, MapPin, Star, Bed, Bus, Sparkles } from "lucide-react";
+import { Calendar, Cloud, MapPin, Star, Bed, Bus, Sparkles, Heart, Utensils, Lightbulb } from "lucide-react";
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, RadialBarChart, RadialBar,
 } from "recharts";
-import { sampleTrip } from "@/lib/mock-data";
+import { useEffect, useState } from "react";
+import { tripStorage } from "@/lib/storage";
+import type { GeneratedTrip } from "@/lib/trip-types";
 
 export const Route = createFileRoute("/trip")({
   head: () => ({ meta: [{ title: "Trip Details — WrapUP" }] }),
@@ -13,8 +15,45 @@ export const Route = createFileRoute("/trip")({
 
 const COLORS = ["#00D4FF", "#00FFB3", "#5EEAD4", "#7CC4FF", "#A78BFA"];
 
+function fmtMoney(n: number, currency = "INR") {
+  if (currency === "INR") return `₹${n.toLocaleString("en-IN")}`;
+  if (currency === "USD") return `$${n.toLocaleString()}`;
+  if (currency === "EUR") return `€${n.toLocaleString()}`;
+  return `${currency} ${n.toLocaleString()}`;
+}
+
 function Trip() {
-  const t = sampleTrip;
+  const [trip, setTrip] = useState<GeneratedTrip | null>(null);
+  const [fav, setFav] = useState(false);
+
+  useEffect(() => {
+    const t = tripStorage.getCurrent();
+    setTrip(t);
+    if (t) setFav(tripStorage.isFavorite(t.id));
+  }, []);
+
+  if (!trip) {
+    return (
+      <div className="px-5 md:px-10 py-16 max-w-3xl mx-auto text-center">
+        <div className="glass rounded-3xl p-10">
+          <Sparkles className="h-8 w-8 text-brand mx-auto" />
+          <h1 className="mt-3 text-2xl font-semibold">No trip yet</h1>
+          <p className="mt-2 text-muted-foreground">Generate your first AI-crafted itinerary to see it here.</p>
+          <Link to="/planner" className="mt-6 inline-flex rounded-xl bg-gradient-brand px-5 py-2.5 text-sm font-medium text-background shadow-glow">
+            Plan a trip
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const t = trip;
+  const currency = t.currency || "INR";
+
+  function toggleFav() {
+    const isNow = tripStorage.toggleFavorite(t);
+    setFav(isNow);
+  }
 
   return (
     <div className="px-5 md:px-10 py-8 md:py-12 max-w-7xl mx-auto">
@@ -26,34 +65,41 @@ function Trip() {
         <div className="mt-3 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
           <div>
             <h1 className="text-4xl md:text-5xl font-semibold">{t.destination}</h1>
-            <p className="mt-2 text-muted-foreground max-w-2xl">{t.summary}</p>
+            <p className="mt-2 text-muted-foreground max-w-2xl">{t.trip_summary}</p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Pill>{t.duration} days</Pill>
             <Pill>{t.travelers} travelers</Pill>
-            <Pill>₹{(t.budgetTotal / 1000).toFixed(0)}k budget</Pill>
-            <Pill>{t.style}</Pill>
+            <Pill>{fmtMoney(t.total_budget, currency)} budget</Pill>
+            {t.style && <Pill>{t.style}</Pill>}
+            <button
+              onClick={toggleFav}
+              className={`glass rounded-full p-2 transition-colors ${fav ? "text-rose-400" : "text-muted-foreground"}`}
+              aria-label="Toggle favorite"
+            >
+              <Heart className={`h-4 w-4 ${fav ? "fill-current" : ""}`} />
+            </button>
           </div>
         </div>
       </motion.div>
 
       {/* Top grid */}
       <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <ChartCard title="Budget distribution" subtitle={`₹${t.budgetTotal.toLocaleString()} total`}>
+        <ChartCard title="Budget distribution" subtitle={fmtMoney(t.total_budget, currency) + " total"}>
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
-              <Pie data={t.budgetBreakdown} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85} paddingAngle={3}>
-                {t.budgetBreakdown.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+              <Pie data={t.budget_breakdown} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85} paddingAngle={3}>
+                {t.budget_breakdown.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
               </Pie>
               <Tooltip contentStyle={tooltipStyle} />
             </PieChart>
           </ResponsiveContainer>
-          <Legend items={t.budgetBreakdown.map((b, i) => ({ name: b.name, color: COLORS[i % COLORS.length], value: `₹${(b.value/1000).toFixed(0)}k` }))} />
+          <Legend items={t.budget_breakdown.map((b, i) => ({ name: b.name, color: COLORS[i % COLORS.length], value: fmtMoney(b.value, currency) }))} />
         </ChartCard>
 
         <ChartCard title="Daily cost breakdown">
           <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={t.costBars}>
+            <BarChart data={t.daily_costs}>
               <XAxis dataKey="name" stroke="var(--muted-foreground)" fontSize={11} tickLine={false} axisLine={false} />
               <YAxis stroke="var(--muted-foreground)" fontSize={11} tickLine={false} axisLine={false} />
               <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "color-mix(in oklab, var(--brand) 10%, transparent)" }} />
@@ -70,14 +116,14 @@ function Trip() {
 
         <ChartCard title="Activity mix">
           <ResponsiveContainer width="100%" height={220}>
-            <RadialBarChart innerRadius="30%" outerRadius="100%" data={t.activityMix} startAngle={90} endAngle={-270}>
+            <RadialBarChart innerRadius="30%" outerRadius="100%" data={t.activities} startAngle={90} endAngle={-270}>
               <RadialBar background dataKey="value" cornerRadius={8}>
-                {t.activityMix.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                {t.activities.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
               </RadialBar>
               <Tooltip contentStyle={tooltipStyle} />
             </RadialBarChart>
           </ResponsiveContainer>
-          <Legend items={t.activityMix.map((a, i) => ({ name: a.name, color: COLORS[i % COLORS.length], value: `${a.value}%` }))} />
+          <Legend items={t.activities.map((a, i) => ({ name: a.name, color: COLORS[i % COLORS.length], value: `${a.value}%` }))} />
         </ChartCard>
       </div>
 
@@ -96,8 +142,8 @@ function Trip() {
         <div className="glass rounded-2xl p-6">
           <h3 className="font-semibold flex items-center gap-2"><Cloud className="h-4 w-4 text-brand" /> Weather</h3>
           <div className="mt-4 grid grid-cols-7 gap-1.5">
-            {t.weather.map((w) => (
-              <div key={w.day} className="rounded-xl bg-accent/50 text-center py-2">
+            {(t.weather || []).map((w, idx) => (
+              <div key={idx} className="rounded-xl bg-accent/50 text-center py-2">
                 <div className="text-[10px] text-muted-foreground">{w.day}</div>
                 <div className="text-sm font-semibold">{w.high}°</div>
                 <div className="text-[10px] text-muted-foreground">{w.low}°</div>
@@ -113,7 +159,7 @@ function Trip() {
         <div className="mt-6 relative">
           <div className="absolute left-4 md:left-6 top-2 bottom-2 w-px bg-gradient-to-b from-brand/60 via-border to-transparent" />
           <div className="space-y-5">
-            {t.days.map((d, i) => (
+            {t.daily_itinerary.map((d, i) => (
               <motion.div key={d.day} initial={{ opacity: 0, x: -10 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}
                 transition={{ delay: 0.05 * i }} className="relative pl-12 md:pl-16">
                 <div className="absolute left-0 md:left-2 top-3 h-8 w-8 rounded-xl bg-gradient-brand text-background grid place-items-center font-semibold text-sm shadow-glow">{d.day}</div>
@@ -147,8 +193,8 @@ function Trip() {
         <div className="glass rounded-2xl p-6">
           <h3 className="font-semibold flex items-center gap-2"><Bed className="h-4 w-4 text-brand" /> Hotel recommendations</h3>
           <div className="mt-4 space-y-3">
-            {t.hotels.map((h) => (
-              <div key={h.name} className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
+            {t.hotels.map((h, i) => (
+              <div key={i} className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
                 <div>
                   <div className="font-medium">{h.name}</div>
                   <div className="text-xs text-muted-foreground">{h.area} • ⭐ {h.rating}</div>
@@ -161,8 +207,8 @@ function Trip() {
         <div className="glass rounded-2xl p-6">
           <h3 className="font-semibold flex items-center gap-2"><Bus className="h-4 w-4 text-brand" /> Transport</h3>
           <div className="mt-4 space-y-3">
-            {t.transport.map((tr) => (
-              <div key={tr.mode} className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
+            {t.transportation.map((tr, i) => (
+              <div key={i} className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
                 <div>
                   <div className="font-medium">{tr.mode}</div>
                   <div className="text-xs text-muted-foreground">{tr.detail}</div>
@@ -171,6 +217,32 @@ function Trip() {
               </div>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* Food & tips */}
+      <div className="mt-10 grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="glass rounded-2xl p-6">
+          <h3 className="font-semibold flex items-center gap-2"><Utensils className="h-4 w-4 text-brand" /> Food recommendations</h3>
+          <div className="mt-4 space-y-3">
+            {(t.food_recommendations || []).map((f, i) => (
+              <div key={i} className="rounded-xl border border-border px-4 py-3">
+                <div className="font-medium text-sm">{f.name}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">{f.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="glass rounded-2xl p-6">
+          <h3 className="font-semibold flex items-center gap-2"><Lightbulb className="h-4 w-4 text-brand" /> Travel tips</h3>
+          <ul className="mt-4 space-y-2">
+            {(t.travel_tips || []).map((tip, i) => (
+              <li key={i} className="flex gap-2 text-sm">
+                <span className="text-brand">•</span>
+                <span className="text-muted-foreground">{tip}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     </div>
