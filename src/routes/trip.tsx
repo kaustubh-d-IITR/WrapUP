@@ -1,12 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { Calendar, Cloud, MapPin, Star, Bed, Bus, Sparkles, Heart, Utensils, Lightbulb } from "lucide-react";
+import { Calendar, Cloud, MapPin, Star, Bed, Bus, Sparkles, Heart, Utensils, Lightbulb, ShieldCheck, RotateCw, ShieldAlert } from "lucide-react";
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, RadialBarChart, RadialBar,
 } from "recharts";
 import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { tripStorage } from "@/lib/storage";
 import type { GeneratedTrip } from "@/lib/trip-types";
+import { getGoogleMapsKey } from "@/lib/trip-generator.functions";
+import { TripMap } from "@/components/TripMap";
 
 export const Route = createFileRoute("/trip")({
   head: () => ({ meta: [{ title: "Trip Details — WrapUP" }] }),
@@ -25,11 +28,14 @@ function fmtMoney(n: number, currency = "INR") {
 function Trip() {
   const [trip, setTrip] = useState<GeneratedTrip | null>(null);
   const [fav, setFav] = useState(false);
+  const getMapsKey = useServerFn(getGoogleMapsKey);
+  const [mapsKey, setMapsKey] = useState<string | null>(null);
 
   useEffect(() => {
     const t = tripStorage.getCurrent();
     setTrip(t);
     if (t) setFav(tripStorage.isFavorite(t.id));
+    getMapsKey().then(res => setMapsKey(res.key));
   }, []);
 
   if (!trip) {
@@ -72,6 +78,7 @@ function Trip() {
             <Pill>{t.travelers} travelers</Pill>
             <Pill>{fmtMoney(t.total_budget, currency)} budget</Pill>
             {t.style && <Pill>{t.style}</Pill>}
+            <AIStatusBadge status={t._ai_status} />
             <button
               onClick={toggleFav}
               className={`glass rounded-full p-2 transition-colors ${fav ? "text-rose-400" : "text-muted-foreground"}`}
@@ -153,6 +160,14 @@ function Trip() {
         </div>
       </div>
 
+      {/* Interactive Map */}
+      <section className="mt-10">
+        <h2 className="text-2xl font-semibold flex items-center gap-2"><MapPin className="h-5 w-5 text-brand" /> Interactive map</h2>
+        <div className="mt-6">
+          <TripMap trip={t} mapsKey={mapsKey} />
+        </div>
+      </section>
+
       {/* Timeline */}
       <section className="mt-10">
         <h2 className="text-2xl font-semibold flex items-center gap-2"><Calendar className="h-5 w-5 text-brand" /> Itinerary</h2>
@@ -170,13 +185,18 @@ function Trip() {
                       <div className="text-lg font-semibold">{d.title}</div>
                     </div>
                   </div>
-                  <div className="mt-4 space-y-3">
+                  <div className="mt-4 space-y-4">
                     {d.items.map((it, idx) => (
                       <div key={idx} className="flex gap-3 text-sm">
                         <div className="shrink-0 w-14 text-xs text-brand font-medium pt-0.5">{it.time}</div>
-                        <div>
+                        <div className="flex-1">
                           <div className="font-medium">{it.title}</div>
                           <div className="text-muted-foreground text-xs mt-0.5">{it.desc}</div>
+                          {it.photoUrl && (
+                            <div className="mt-2 h-32 w-full max-w-md rounded-lg overflow-hidden bg-muted">
+                              <img src={it.photoUrl} alt={it.title} className="h-full w-full object-cover" />
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -194,12 +214,19 @@ function Trip() {
           <h3 className="font-semibold flex items-center gap-2"><Bed className="h-4 w-4 text-brand" /> Hotel recommendations</h3>
           <div className="mt-4 space-y-3">
             {t.hotels.map((h, i) => (
-              <div key={i} className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
-                <div>
+              <div key={i} className="flex overflow-hidden rounded-xl border border-border">
+                {h.photoUrl && (
+                  <div className="w-24 shrink-0 bg-muted">
+                    <img src={h.photoUrl} alt={h.name} className="h-full w-full object-cover" />
+                  </div>
+                )}
+                <div className="flex-1 p-4">
                   <div className="font-medium">{h.name}</div>
-                  <div className="text-xs text-muted-foreground">{h.area} • ⭐ {h.rating}</div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {h.address || h.area} • ⭐ {h.realRating || h.rating} {h.reviewsCount ? `(${h.reviewsCount})` : ''}
+                  </div>
+                  <div className="text-sm font-semibold text-brand mt-2">{h.price}</div>
                 </div>
-                <div className="text-sm font-semibold text-brand">{h.price}</div>
               </div>
             ))}
           </div>
@@ -226,9 +253,23 @@ function Trip() {
           <h3 className="font-semibold flex items-center gap-2"><Utensils className="h-4 w-4 text-brand" /> Food recommendations</h3>
           <div className="mt-4 space-y-3">
             {(t.food_recommendations || []).map((f, i) => (
-              <div key={i} className="rounded-xl border border-border px-4 py-3">
-                <div className="font-medium text-sm">{f.name}</div>
-                <div className="text-xs text-muted-foreground mt-0.5">{f.desc}</div>
+              <div key={i} className="flex overflow-hidden rounded-xl border border-border">
+                {f.photoUrl && (
+                  <div className="w-24 shrink-0 bg-muted">
+                    <img src={f.photoUrl} alt={f.name} className="h-full w-full object-cover" />
+                  </div>
+                )}
+                <div className="flex-1 p-4">
+                  <div className="font-medium text-sm">{f.name}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{f.desc}</div>
+                  {(f.realRating || f.priceLevel || f.openStatus) && (
+                    <div className="text-xs text-muted-foreground mt-2 flex items-center gap-2">
+                      {f.realRating && <span>⭐ {f.realRating}</span>}
+                      {f.priceLevel && <span>• {f.priceLevel}</span>}
+                      {f.openStatus && <span>• {f.openStatus}</span>}
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -259,6 +300,38 @@ const tooltipStyle = {
 
 function Pill({ children }: { children: React.ReactNode }) {
   return <span className="glass rounded-full px-3 py-1.5 text-xs font-medium">{children}</span>;
+}
+function AIStatusBadge({ status }: { status?: string }) {
+  if (!status) return null;
+  const config = {
+    validated: {
+      icon: ShieldCheck,
+      label: "AI Response Validated",
+      className: "text-emerald-400 border-emerald-400/30 bg-emerald-400/10",
+    },
+    retry_used: {
+      icon: RotateCw,
+      label: "AI Retry Used",
+      className: "text-amber-400 border-amber-400/30 bg-amber-400/10",
+    },
+    fallback_used: {
+      icon: ShieldAlert,
+      label: "Fallback Used",
+      className: "text-orange-400 border-orange-400/30 bg-orange-400/10",
+    },
+  }[status] ?? null;
+
+  if (!config) return null;
+  const Icon = config.icon;
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider ${config.className}`}
+      title={config.label}
+    >
+      <Icon className="h-3 w-3" />
+      {config.label}
+    </span>
+  );
 }
 function ChartCard({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (

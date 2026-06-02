@@ -56,7 +56,6 @@ function Planner() {
       const trip: GeneratedTrip = {
         id: `trip_${Date.now()}`,
         createdAt: Date.now(),
-        currency: "INR",
         ...raw,
       };
       tripStorage.setCurrent(trip);
