@@ -3,12 +3,12 @@ import { motion } from "framer-motion";
 import { MapPin, Filter, Star, Navigation, Compass } from "lucide-react";
 
 const destinations = [
-  { id: "1", name: "Kyoto", country: "Japan", image: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=800&q=80", popularity: 4.9, tagline: "Temples & Cherry Blossoms", budget: "₹1.5L - ₹2.5L", season: "Spring" },
-  { id: "2", name: "Zermatt", country: "Switzerland", image: "https://images.unsplash.com/photo-1530122037265-a5f1f91d3b99?w=800&q=80", popularity: 4.8, tagline: "Alpine wonder", budget: "₹2.5L - ₹4L", season: "Winter" },
-  { id: "3", name: "Ubud", country: "Indonesia", image: "https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=800&q=80", popularity: 4.7, tagline: "Spiritual retreat", budget: "₹60K - ₹1L", season: "Summer" },
-  { id: "4", name: "Paris", country: "France", image: "https://images.unsplash.com/photo-1502602898657-3e907a5ea071?w=800&q=80", popularity: 4.9, tagline: "City of Light", budget: "₹2L - ₹3.5L", season: "Spring/Summer" },
-  { id: "5", name: "Santorini", country: "Greece", image: "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=800&q=80", popularity: 4.8, tagline: "Sunset views", budget: "₹1.8L - ₹3L", season: "Summer" },
-  { id: "6", name: "Machu Picchu", country: "Peru", image: "https://images.unsplash.com/photo-1587595431973-160d0d94add1?w=800&q=80", popularity: 4.9, tagline: "Ancient ruins", budget: "₹2L - ₹3L", season: "Dry Season" }
+  { id: "1", name: "Kyoto", country: "Japan", image: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=800&q=80", popularity: 4.9, tagline: "Temples & Cherry Blossoms", budget: "₹1.5L - ₹2.5L", plannerBudget: 200000, season: "Spring" },
+  { id: "2", name: "Zermatt", country: "Switzerland", image: "https://images.unsplash.com/photo-1530122037265-a5f1f91d3b99?w=800&q=80", popularity: 4.8, tagline: "Alpine wonder", budget: "₹2.5L - ₹4L", plannerBudget: 350000, season: "Winter" },
+  { id: "3", name: "Ubud", country: "Indonesia", image: "https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=800&q=80", popularity: 4.7, tagline: "Spiritual retreat", budget: "₹60K - ₹1L", plannerBudget: 80000, season: "Summer" },
+  { id: "4", name: "Paris", country: "France", image: "https://images.unsplash.com/photo-1502602898657-3e907a5ea071?w=800&q=80", popularity: 4.9, tagline: "City of Light", budget: "₹2L - ₹3.5L", plannerBudget: 250000, season: "Spring/Summer" },
+  { id: "5", name: "Santorini", country: "Greece", image: "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=800&q=80", popularity: 4.8, tagline: "Sunset views", budget: "₹1.8L - ₹3L", plannerBudget: 200000, season: "Summer" },
+  { id: "6", name: "Machu Picchu", country: "Peru", image: "https://images.unsplash.com/photo-1587595431973-160d0d94add1?w=800&q=80", popularity: 4.9, tagline: "Ancient ruins", budget: "₹2L - ₹3L", plannerBudget: 250000, season: "Dry Season" }
 ];
 
 export const Route = createFileRoute("/explore")({
@@ -32,9 +32,11 @@ function Explore() {
               to="/planner" 
               search={{ 
                 destination: d.name, 
-                budget: d.budget, 
+                budget: d.plannerBudget.toString(), 
                 duration: "7", 
-                style: "Balanced" 
+                travelers: "2",
+                style: "Balanced",
+                autoGenerate: "true"
               }} 
               className="group block glass rounded-3xl overflow-hidden hover:shadow-glow transition-all"
             >

@@ -15,6 +15,8 @@ export const Route = createFileRoute("/planner")({
       budget: search.budget as string | undefined,
       duration: search.duration as string | undefined,
       style: search.style as string | undefined,
+      travelers: search.travelers as string | undefined,
+      autoGenerate: search.autoGenerate as string | undefined,
     }
   },
   component: Planner,
@@ -36,9 +38,12 @@ function Planner() {
   
   const [mode, setMode] = useState<Mode>(search.destination ? "structured" : "select");
   const [prompt, setPrompt] = useState("");
+  
+  const bStr = search.budget ? search.budget.replace(/\\D/g, '') : '';
+  
   const [destination, setDestination] = useState(search.destination || "");
-  const [budget, setBudget] = useState(search.budget ? search.budget.replace(/\\D/g, '') : "100000");
-  const [travelers, setTravelers] = useState("2");
+  const [budget, setBudget] = useState(bStr || "100000");
+  const [travelers, setTravelers] = useState(search.travelers || "2");
   const [style, setStyle] = useState(search.style || "Balanced");
   const [duration, setDuration] = useState(search.duration || "7");
   const [interests, setInterests] = useState("");
@@ -46,32 +51,28 @@ function Planner() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (search.destination) {
-      setMode("structured");
-      setDestination(search.destination);
-      if (search.budget) setBudget(search.budget.replace(/\\D/g, ''));
-      if (search.duration) setDuration(search.duration);
-      if (search.style) setStyle(search.style);
+    if (search.destination && search.autoGenerate === "true") {
+      // Auto-generate immediately using the search parameters (falling back to defaults)
+      const payload = {
+        mode: "structured" as const,
+        destination: search.destination,
+        budget: Number(bStr || "100000"),
+        duration: Number(search.duration || "7"),
+        travelers: Number(search.travelers || "2"),
+        style: search.style || "Balanced",
+        interests: "",
+      };
+      
+      // We push state so the search params are cleared and we don't loop
+      navigate({ to: "/planner", replace: true });
+      doGenerate(payload);
     }
-  }, [search]);
+  }, [search.autoGenerate]);
 
-  async function generate() {
+  async function doGenerate(payload: any) {
     setError(null);
     setLoading(true);
     try {
-      const payload =
-        mode === "natural"
-          ? { mode: "natural" as const, prompt }
-          : {
-              mode: "structured" as const,
-              destination,
-              budget: Number(budget),
-              duration: Number(duration),
-              travelers: Number(travelers),
-              style,
-              interests,
-            };
-
       const raw = await callGenerate({ data: payload });
       const trip: GeneratedTrip = {
         id: `trip_${Date.now()}`,
@@ -87,6 +88,22 @@ function Planner() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function generate() {
+    const payload =
+      mode === "natural"
+        ? { mode: "natural" as const, prompt }
+        : {
+            mode: "structured" as const,
+            destination,
+            budget: Number(budget) || 100000,
+            duration: Number(duration) || 7,
+            travelers: Number(travelers) || 2,
+            style,
+            interests,
+          };
+    doGenerate(payload);
   }
 
   return (
