@@ -1,7 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { Star, Compass } from "lucide-react";
-import { destinations } from "@/lib/mock-data";
+import { MapPin, Filter, Star, Navigation } from "lucide-react";
+
+const destinations = [
+  { id: "1", name: "Kyoto", country: "Japan", image: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=800&q=80" },
+  { id: "2", name: "Zermatt", country: "Switzerland", image: "https://images.unsplash.com/photo-1530122037265-a5f1f91d3b99?w=800&q=80" },
+  { id: "3", name: "Ubud", country: "Indonesia", image: "https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=800&q=80" },
+  { id: "4", name: "Paris", country: "France", image: "https://images.unsplash.com/photo-1502602898657-3e907a5ea071?w=800&q=80" },
+  { id: "5", name: "Santorini", country: "Greece", image: "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=800&q=80" },
+  { id: "6", name: "Machu Picchu", country: "Peru", image: "https://images.unsplash.com/photo-1587595431973-160d0d94add1?w=800&q=80" }
+];
 
 export const Route = createFileRoute("/explore")({
   head: () => ({ meta: [{ title: "Explore — WrapUP" }] }),

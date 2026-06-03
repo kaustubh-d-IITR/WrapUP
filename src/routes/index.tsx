@@ -1,7 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { Search, Sparkles, TrendingUp, Compass, Plane, Wallet } from "lucide-react";
-import { destinations, recentTrips } from "@/lib/mock-data";
+const recentTrips = [
+  { id: "1", name: "Tokyo & Kyoto", date: "April 2026", img: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=800&q=80" },
+  { id: "2", name: "Swiss Alps", date: "December 2025", img: "https://images.unsplash.com/photo-1530122037265-a5f1f91d3b99?w=800&q=80" },
+  { id: "3", name: "Bali Escape", date: "October 2025", img: "https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=800&q=80" }
+];
+
+const destinations = [
+  { id: "1", name: "Kyoto", country: "Japan", image: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=800&q=80" },
+  { id: "2", name: "Zermatt", country: "Switzerland", image: "https://images.unsplash.com/photo-1530122037265-a5f1f91d3b99?w=800&q=80" },
+  { id: "3", name: "Ubud", country: "Indonesia", image: "https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=800&q=80" },
+  { id: "4", name: "Paris", country: "France", image: "https://images.unsplash.com/photo-1502602898657-3e907a5ea071?w=800&q=80" }
+];
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [{ title: "Dashboard — WrapUP" }] }),
