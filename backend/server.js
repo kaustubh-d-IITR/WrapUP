@@ -318,7 +318,7 @@ app.post("/generate-trip", async (req, res) => {
 const swaggerDocument = {
   openapi: "3.0.0",
   info: { title: "WrapUP API", version: "0.1.0" },
-  servers: [{ url: "http://localhost:8787" }],
+  servers: [{ url: process.env.API_BASE_URL || "http://localhost:8787" }],
   paths: {
     "/generate-trip": {
       post: {

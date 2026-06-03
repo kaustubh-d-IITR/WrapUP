@@ -19,7 +19,8 @@ export const generateTrip = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => InputSchema.parse(data))
   .handler(async ({ data }): Promise<ValidatedTrip & { _ai_status: AIStatus }> => {
     // Proxy the request directly to our backend server
-    const backendUrl = "http://localhost:8787/generate-trip";
+    const baseUrl = process.env.VITE_API_URL || "http://localhost:8787";
+    const backendUrl = `${baseUrl.replace(/\/$/, '')}/generate-trip`;
     const res = await fetch(backendUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
