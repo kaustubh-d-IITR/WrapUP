@@ -245,49 +245,62 @@ app.post("/generate-trip", async (req, res) => {
   if (!apiKey) return res.status(500).json({ error: "GROQ_API_KEY is missing in backend environment" });
 
   try {
-    const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        temperature: 0.7,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: SYSTEM },
-          { role: "user", content: buildUserPrompt(req.body) },
-        ],
-      }),
-    });
-
-    if (!groqRes.ok) {
-      const text = await groqRes.text();
-      return res.status(groqRes.status).json({ error: `Groq API error: ${text}` });
-    }
-
-    const json = await groqRes.json();
-    const content = json?.choices?.[0]?.message?.content || "";
-    let parsed;
-    try {
-      parsed = JSON.parse(content);
-    } catch {
-      return res.status(500).json({ error: "Malformed JSON returned by AI", raw: content });
-    }
-
-    const validation = TripResponseSchema.safeParse(parsed);
-    if (!validation.success) {
-      return res.status(500).json({ 
-        error: "AI response failed schema validation", 
-        issues: validation.error.issues 
-      });
-    }
-
-    const enriched = await enrichTrip(validation.data, process.env.GOOGLE_MAPS_API_KEY || "");
+    let validation;
+    let enriched;
+    let aiStatus = "validated";
     
-    // Pass the ai status property down
-    res.json({ ...enriched, _ai_status: "validated" });
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          temperature: attempt === 1 ? 0.7 : 0.4,
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: SYSTEM },
+            { role: "user", content: buildUserPrompt(req.body) },
+          ],
+        }),
+      });
+
+      if (!groqRes.ok) {
+        if (attempt === 2) {
+          const text = await groqRes.text();
+          return res.status(groqRes.status).json({ error: `Groq API error: ${text}` });
+        }
+        continue;
+      }
+
+      const json = await groqRes.json();
+      const content = json?.choices?.[0]?.message?.content || "";
+      let parsed;
+      try {
+        parsed = JSON.parse(content);
+      } catch {
+        if (attempt === 2) return res.status(500).json({ error: "Malformed JSON returned by AI", raw: content });
+        continue;
+      }
+
+      validation = TripResponseSchema.safeParse(parsed);
+      if (validation.success) {
+        if (attempt === 2) aiStatus = "retry_used";
+        break; // Validation passed!
+      } else if (attempt === 2) {
+        return res.status(500).json({ 
+          error: "AI response failed schema validation", 
+          issues: validation.error.issues 
+        });
+      }
+    }
+
+    if (validation && validation.success) {
+      enriched = await enrichTrip(validation.data, process.env.GOOGLE_MAPS_API_KEY || "");
+      res.json({ ...enriched, _ai_status: aiStatus });
+    }
   } catch (error) {
     console.error("Generate trip error:", error);
     res.status(500).json({ error: "Internal server error", message: error.message });
