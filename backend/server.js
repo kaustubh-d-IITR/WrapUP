@@ -8,7 +8,14 @@ import * as dotenv from "dotenv";
 dotenv.config({ path: "../.env" });
 
 const app = express();
-app.use(cors());
+
+const allowedOrigins = process.env.FRONTEND_URL 
+  ? [process.env.FRONTEND_URL, "http://localhost:5173", "http://localhost:8080"] 
+  : "*";
+
+app.use(cors({
+  origin: allowedOrigins,
+}));
 app.use(express.json());
 
 // ── Zod Schemas ────────────────────────────────────────────────────────
@@ -212,7 +219,7 @@ Required JSON schema (all keys required):
   "transportation": [{ "mode": string, "detail": string, "cost": string }] (3 items),
   "budget_breakdown": [{ "name": "Stay"|"Food"|"Transport"|"Activities"|"Misc", "value": number }] (sum equals total_budget),
   "daily_costs": [{ "name": "Day 1"...,"cost": number }] (one per day, sum ~ total_budget),
-  "travel_tips": string[] (4-6 items),
+  "travel_tips": string[] (Array of simple strings ONLY. DO NOT return objects. 4-6 items),
   "weather": [{ "day": "Mon"..., "high": number, "low": number, "cond": string }] (up to 7)
 }
 

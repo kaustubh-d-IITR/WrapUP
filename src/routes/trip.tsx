@@ -10,12 +10,6 @@ import { tripStorage } from "@/lib/storage";
 import type { GeneratedTrip } from "@/lib/trip-types";
 import { getGoogleMapsKey } from "@/lib/trip-generator.functions";
 import { TripMap } from "@/components/TripMap";
-import { useRef } from "react";
-import html2canvas from "html2canvas";
-import QRCode from "qrcode";
-import { pdf } from "@react-pdf/renderer";
-import { TripPDF } from "@/components/TripPDF";
-import { Download } from "lucide-react";
 
 export const Route = createFileRoute("/trip")({
   head: () => ({ meta: [{ title: "Trip Details — WrapUP" }] }),
@@ -34,8 +28,6 @@ function fmtMoney(n: number, currency = "INR") {
 function Trip() {
   const [trip, setTrip] = useState<GeneratedTrip | null>(null);
   const [fav, setFav] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
-  const chartRef = useRef<HTMLDivElement>(null);
   const getMapsKey = useServerFn(getGoogleMapsKey);
   const [mapsKey, setMapsKey] = useState<string | null>(null);
 
@@ -69,38 +61,6 @@ function Trip() {
     setFav(isNow);
   }
 
-  async function exportPDF() {
-    if (!t) return;
-    setIsExporting(true);
-    try {
-      let chartImage = undefined;
-      if (chartRef.current) {
-        const canvas = await html2canvas(chartRef.current);
-        chartImage = canvas.toDataURL("image/png");
-      }
-      
-      const qrCodeImage = await QRCode.toDataURL(window.location.href);
-
-      const doc = <TripPDF trip={t} chartImage={chartImage} qrCodeImage={qrCodeImage} tripUrl={window.location.href} />;
-      const asPdf = pdf();
-      asPdf.updateContainer(doc);
-      const blob = await asPdf.toBlob();
-      
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${t.destination.replace(/\\s+/g, "_")}_${t.duration}Days_WrapUP.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("PDF Export failed:", error);
-    } finally {
-      setIsExporting(false);
-    }
-  }
-
   return (
     <div className="px-5 md:px-10 py-8 md:py-12 max-w-7xl mx-auto">
       {/* Header */}
@@ -120,14 +80,6 @@ function Trip() {
             {t.style && <Pill>{t.style}</Pill>}
             <AIStatusBadge status={t._ai_status} />
             <button
-              onClick={exportPDF}
-              disabled={isExporting}
-              className={`glass rounded-full p-2 transition-colors ${isExporting ? "opacity-50" : "hover:text-brand"}`}
-              aria-label="Download PDF"
-            >
-              <Download className="h-4 w-4 text-muted-foreground" />
-            </button>
-            <button
               onClick={toggleFav}
               className={`glass rounded-full p-2 transition-colors ${fav ? "text-rose-400" : "text-muted-foreground"}`}
               aria-label="Toggle favorite"
@@ -141,17 +93,15 @@ function Trip() {
       {/* Top grid */}
       <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-5">
         <ChartCard title="Budget distribution" subtitle={fmtMoney(t.total_budget, currency) + " total"}>
-          <div ref={chartRef} style={{ background: 'transparent' }}>
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie data={t.budget_breakdown} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85} paddingAngle={3}>
-                  {t.budget_breakdown.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                </Pie>
-                <Tooltip contentStyle={tooltipStyle} />
-              </PieChart>
-            </ResponsiveContainer>
-            <Legend items={t.budget_breakdown.map((b, i) => ({ name: b.name, color: COLORS[i % COLORS.length], value: fmtMoney(b.value, currency) }))} />
-          </div>
+          <ResponsiveContainer width="100%" height={220}>
+            <PieChart>
+              <Pie data={t.budget_breakdown} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85} paddingAngle={3}>
+                {t.budget_breakdown.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+              </Pie>
+              <Tooltip contentStyle={tooltipStyle} />
+            </PieChart>
+          </ResponsiveContainer>
+          <Legend items={t.budget_breakdown.map((b, i) => ({ name: b.name, color: COLORS[i % COLORS.length], value: fmtMoney(b.value, currency) }))} />
         </ChartCard>
 
         <ChartCard title="Daily cost breakdown">
