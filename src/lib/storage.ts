@@ -15,7 +15,16 @@ function read<T>(key: string, fallback: T): T {
 }
 function write<T>(key: string, value: T) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(key, JSON.stringify(value));
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (e: any) {
+    console.warn("Storage write failed", e);
+    // If QuotaExceededError and it's the history array, try to store fewer items
+    if (e.name === "QuotaExceededError" && key === "wrapup-history" && Array.isArray(value) && value.length > 5) {
+      console.log("Truncating history due to quota limit");
+      write(key, value.slice(0, 5));
+    }
+  }
 }
 
 export const tripStorage = {

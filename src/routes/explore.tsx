@@ -28,7 +28,16 @@ function Explore() {
       <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {destinations.map((d, i) => (
           <motion.div key={d.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 * i }}>
-            <Link to="/trip" className="group block glass rounded-3xl overflow-hidden hover:shadow-glow transition-all">
+            <Link 
+              to="/planner" 
+              search={{ 
+                destination: d.name, 
+                budget: d.budget, 
+                duration: "7", 
+                style: "Balanced" 
+              }} 
+              className="group block glass rounded-3xl overflow-hidden hover:shadow-glow transition-all"
+            >
               <div className="relative aspect-[4/3] overflow-hidden">
                 <img src={d.image} alt={d.name} className="h-full w-full object-cover transition-transform duration-[1200ms] group-hover:scale-110" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />

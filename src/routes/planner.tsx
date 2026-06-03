@@ -1,7 +1,7 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Wand2, Users, IndianRupee, Clock, MapPin, MessageSquare, SlidersHorizontal, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { generateTrip } from "@/lib/trip-generator.functions";
 import { tripStorage } from "@/lib/storage";
@@ -9,6 +9,14 @@ import type { GeneratedTrip } from "@/lib/trip-types";
 
 export const Route = createFileRoute("/planner")({
   head: () => ({ meta: [{ title: "AI Planner — WrapUP" }] }),
+  validateSearch: (search: Record<string, unknown>) => {
+    return {
+      destination: search.destination as string | undefined,
+      budget: search.budget as string | undefined,
+      duration: search.duration as string | undefined,
+      style: search.style as string | undefined,
+    }
+  },
   component: Planner,
 });
 
@@ -23,17 +31,29 @@ type Mode = "select" | "natural" | "structured";
 
 function Planner() {
   const navigate = useNavigate();
+  const search = Route.useSearch();
   const callGenerate = useServerFn(generateTrip);
-  const [mode, setMode] = useState<Mode>("select");
+  
+  const [mode, setMode] = useState<Mode>(search.destination ? "structured" : "select");
   const [prompt, setPrompt] = useState("");
-  const [destination, setDestination] = useState("");
-  const [budget, setBudget] = useState("100000");
+  const [destination, setDestination] = useState(search.destination || "");
+  const [budget, setBudget] = useState(search.budget ? search.budget.replace(/\\D/g, '') : "100000");
   const [travelers, setTravelers] = useState("2");
-  const [style, setStyle] = useState("Balanced");
-  const [duration, setDuration] = useState("7");
+  const [style, setStyle] = useState(search.style || "Balanced");
+  const [duration, setDuration] = useState(search.duration || "7");
   const [interests, setInterests] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (search.destination) {
+      setMode("structured");
+      setDestination(search.destination);
+      if (search.budget) setBudget(search.budget.replace(/\\D/g, ''));
+      if (search.duration) setDuration(search.duration);
+      if (search.style) setStyle(search.style);
+    }
+  }, [search]);
 
   async function generate() {
     setError(null);
