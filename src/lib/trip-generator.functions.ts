@@ -42,25 +42,31 @@ export const generateTrip = createServerFn({ method: "POST" })
   });
 
 export const checkGroqStatus = createServerFn({ method: "GET" }).handler(async () => {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) return { configured: false, ok: false, message: "GROQ_API_KEY missing" };
+  const baseUrl = process.env.VITE_API_URL || "http://localhost:8787";
   try {
-    const res = await fetch("https://api.groq.com/openai/v1/models", {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
-    return { configured: true, ok: res.ok, status: res.status };
+    const res = await fetch(`${baseUrl.replace(/\/$/, '')}/status/groq`);
+    return await res.json();
   } catch (e) {
     return { configured: true, ok: false, message: (e as Error).message };
   }
 });
 
 export const getGoogleMapsKey = createServerFn({ method: "GET" }).handler(async () => {
-  return { key: process.env.GOOGLE_MAPS_API_KEY || null };
+  const baseUrl = process.env.VITE_API_URL || "http://localhost:8787";
+  try {
+    const res = await fetch(`${baseUrl.replace(/\/$/, '')}/api-key/maps`);
+    return await res.json();
+  } catch (e) {
+    return { key: null };
+  }
 });
 
 export const checkMapsStatus = createServerFn({ method: "GET" }).handler(async () => {
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-  if (!apiKey) return { configured: false, ok: false, message: "GOOGLE_MAPS_API_KEY missing" };
-  const isLikelyValid = apiKey.startsWith("AIza");
-  return { configured: true, ok: isLikelyValid, status: isLikelyValid ? 200 : 400 };
+  const baseUrl = process.env.VITE_API_URL || "http://localhost:8787";
+  try {
+    const res = await fetch(`${baseUrl.replace(/\/$/, '')}/status/maps`);
+    return await res.json();
+  } catch (e) {
+    return { configured: true, ok: false, message: (e as Error).message };
+  }
 });

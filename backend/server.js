@@ -247,6 +247,30 @@ Generate the trip JSON now.`;
 // ── API Routes ────────────────────────────────────────────────────────
 app.get("/health", (_req, res) => res.json({ ok: true, service: "wrapup-backend" }));
 
+app.get("/status/groq", async (req, res) => {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return res.json({ configured: false, ok: false, message: "GROQ_API_KEY missing on backend" });
+  try {
+    const groqRes = await fetch("https://api.groq.com/openai/v1/models", {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    return res.json({ configured: true, ok: groqRes.ok, status: groqRes.status });
+  } catch (e) {
+    return res.json({ configured: true, ok: false, message: e.message });
+  }
+});
+
+app.get("/status/maps", (req, res) => {
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey) return res.json({ configured: false, ok: false, message: "GOOGLE_MAPS_API_KEY missing on backend" });
+  const isLikelyValid = apiKey.startsWith("AIza");
+  return res.json({ configured: true, ok: isLikelyValid, status: isLikelyValid ? 200 : 400 });
+});
+
+app.get("/api-key/maps", (req, res) => {
+  return res.json({ key: process.env.GOOGLE_MAPS_API_KEY || null });
+});
+
 app.post("/generate-trip", async (req, res) => {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return res.status(500).json({ error: "GROQ_API_KEY is missing in backend environment" });
