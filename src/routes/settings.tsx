@@ -30,7 +30,7 @@ function SettingsPage() {
           setGroqDetail("GROQ_API_KEY not configured");
         } else if (s.ok) {
           setGroq("connected");
-          setGroqDetail("Live • llama-3.3-70b-versatile");
+          setGroqDetail("Live • openai/gpt-oss-120b");
         } else {
           setGroq("error");
           setGroqDetail(`HTTP ${s.status ?? "error"}`);

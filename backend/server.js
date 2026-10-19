@@ -288,8 +288,13 @@ app.post("/generate-trip", async (req, res) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
+          // llama-3.3-70b-versatile was removed from Groq on 2026-08-16.
+          // gpt-oss-120b is Groq's recommended replacement and supports JSON mode.
+          model: "openai/gpt-oss-120b",
           temperature: attempt === 1 ? 0.7 : 0.4,
+          max_completion_tokens: 8192,
+          reasoning_effort: "low",
+          include_reasoning: false,
           response_format: { type: "json_object" },
           messages: [
             { role: "system", content: SYSTEM },

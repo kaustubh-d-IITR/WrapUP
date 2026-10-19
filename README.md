@@ -1,7 +1,7 @@
 # WrapUP — AI Travel Planner
 
 Plan beautiful, dynamic trips in seconds with an AI co-pilot powered by Groq
-(`llama-3.3-70b-versatile`). WrapUP turns natural-language requests or
+(`openai/gpt-oss-120b`). WrapUP turns natural-language requests or
 structured inputs into a full visual itinerary with charts, hotels, transport,
 food, costs, and tips.
 
