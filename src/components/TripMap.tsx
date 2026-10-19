@@ -136,15 +136,13 @@ export function TripMap({ trip }: { trip: GeneratedTrip }) {
   }, [routePoints]);
 
   const center = points[0] || [20.5937, 78.9629];
-  const tiles =
-    theme === "dark"
-      ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-      : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+  const tiles = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 
   return (
-    <div className="h-[500px] w-full rounded-2xl overflow-hidden relative border border-border shadow-md">
+    <div className={`h-[500px] w-full rounded-2xl overflow-hidden relative border border-border shadow-md ${theme === "dark" ? "map-tiles-dark" : ""}`}>
+      <style>{`.map-tiles-dark .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.95); }`}</style>
       <MapContainer center={center} zoom={points.length ? 12 : 4} style={{ height: "100%", width: "100%" }} scrollWheelZoom>
-        <TileLayer key={tiles} attribution='&copy; OpenStreetMap &copy; CARTO' url={tiles} />
+        <TileLayer key={tiles} attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url={tiles} />
         <FitToPoints points={points} />
         {route.length > 1 && <Polyline positions={route} pathOptions={{ color: "#00D4FF", weight: 4, opacity: 0.9 }} />}
         {markers.map((marker) => (
