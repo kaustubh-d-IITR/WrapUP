@@ -4,12 +4,9 @@ import { Calendar, Cloud, MapPin, Star, Bed, Bus, Sparkles, Heart, Utensils, Lig
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, RadialBarChart, RadialBar,
 } from "recharts";
-import { useEffect, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
+import { useEffect, useState, type ComponentType } from "react";
 import { tripStorage } from "@/lib/storage";
 import type { GeneratedTrip } from "@/lib/trip-types";
-import { getGoogleMapsKey } from "@/lib/trip-generator.functions";
-import { TripMap } from "@/components/TripMap";
 
 export const Route = createFileRoute("/trip")({
   head: () => ({ meta: [{ title: "Trip Details — WrapUP" }] }),
@@ -28,14 +25,11 @@ function fmtMoney(n: number, currency = "INR") {
 function Trip() {
   const [trip, setTrip] = useState<GeneratedTrip | null>(null);
   const [fav, setFav] = useState(false);
-  const getMapsKey = useServerFn(getGoogleMapsKey);
-  const [mapsKey, setMapsKey] = useState<string | null>(null);
 
   useEffect(() => {
     const t = tripStorage.getCurrent();
     setTrip(t);
     if (t) setFav(tripStorage.isFavorite(t.id));
-    getMapsKey().then(res => setMapsKey(res.key));
   }, []);
 
   if (!trip) {
@@ -164,7 +158,7 @@ function Trip() {
       <section className="mt-10">
         <h2 className="text-2xl font-semibold flex items-center gap-2"><MapPin className="h-5 w-5 text-brand" /> Interactive map</h2>
         <div className="mt-6">
-          <TripMap trip={t} mapsKey={mapsKey} />
+          <ClientTripMap trip={t} />
         </div>
       </section>
 
@@ -297,6 +291,17 @@ const tooltipStyle = {
   fontSize: 12,
   color: "var(--popover-foreground)",
 };
+
+function ClientTripMap({ trip }: { trip: GeneratedTrip }) {
+  const [MapView, setMapView] = useState<ComponentType<{ trip: GeneratedTrip }> | null>(null);
+  useEffect(() => {
+    import("@/components/TripMap").then((mod) => setMapView(() => mod.TripMap));
+  }, []);
+  if (!MapView) {
+    return <div className="h-[500px] glass rounded-2xl animate-pulse" />;
+  }
+  return <MapView trip={trip} />;
+}
 
 function Pill({ children }: { children: React.ReactNode }) {
   return <span className="glass rounded-full px-3 py-1.5 text-xs font-medium">{children}</span>;

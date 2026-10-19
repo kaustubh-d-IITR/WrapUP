@@ -107,93 +107,119 @@ const TripResponseSchema = z.object({
   weather: z.array(WeatherSchema).optional().default([]),
 });
 
-// ── Google Maps Enrichment ─────────────────────────────────────────────
-async function enrichTrip(trip, apiKey) {
-  if (!apiKey) return trip;
-  const enrichedTrip = JSON.parse(JSON.stringify(trip));
+// ── OpenStreetMap enrichment ───────────────────────────────────────
+// Nominatim's public server allows about one request per second.
+// Cap lookups so a generate call stays well under the host timeout.
+const PLACE_LOOKUP_LIMIT = 8;
+const NOMINATIM_GAP_MS = 1100;
+const OSM_USER_AGENT = "WrapUP/1.0 (https://wrap-up-six.vercel.app)";
 
-  async function searchPlace(query) {
-    try {
-      const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Goog-Api-Key": apiKey,
-          "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.location,places.priceLevel,places.regularOpeningHours,places.photos",
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isGenericStop(title) {
+  const titleLower = title.toLowerCase();
+  return ["lunch", "breakfast", "dinner", "check-in", "check in", "departure"].some((word) => titleLower.includes(word));
+}
+
+async function searchPlace(query) {
+  try {
+    const url = new URL("https://nominatim.openstreetmap.org/search");
+    url.searchParams.set("q", query);
+    url.searchParams.set("format", "jsonv2");
+    url.searchParams.set("limit", "1");
+    const res = await fetch(url, {
+      headers: { "User-Agent": OSM_USER_AGENT, Accept: "application/json" },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) return null;
+    const hit = data[0];
+    const lat = Number(hit.lat);
+    const lng = Number(hit.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return {
+      placeId: hit.place_id != null ? String(hit.place_id) : undefined,
+      coordinates: { lat, lng },
+      address: hit.display_name,
+    };
+  } catch (e) {
+    console.error("Place lookup error:", e);
+    return null;
+  }
+}
+
+async function wikiPhoto(query) {
+  const title = query.split(" in ")[0].trim();
+  if (!title) return null;
+  try {
+    const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
+    const res = await fetch(url, {
+      headers: { "User-Agent": OSM_USER_AGENT, "Api-User-Agent": OSM_USER_AGENT },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.type === "disambiguation") return null;
+    return data.originalimage?.source || data.thumbnail?.source || null;
+  } catch (e) {
+    console.error("Photo lookup error:", e);
+    return null;
+  }
+}
+
+async function enrichTrip(trip) {
+  const enrichedTrip = JSON.parse(JSON.stringify(trip));
+  const jobs = [];
+
+  for (const hotel of enrichedTrip.hotels || []) {
+    jobs.push({
+      query: `${hotel.name} in ${trip.destination}`,
+      apply(place) {
+        hotel.placeId = place.placeId;
+        hotel.coordinates = place.coordinates;
+        if (place.address) hotel.address = place.address;
+        if (place.photoUrl) hotel.photoUrl = place.photoUrl;
+      },
+    });
+  }
+
+  for (const food of enrichedTrip.food_recommendations || []) {
+    jobs.push({
+      query: `${food.name} in ${trip.destination}`,
+      apply(place) {
+        food.placeId = place.placeId;
+        food.coordinates = place.coordinates;
+        if (place.photoUrl) food.photoUrl = place.photoUrl;
+      },
+    });
+  }
+
+  for (const day of enrichedTrip.daily_itinerary || []) {
+    for (const item of day.items || []) {
+      if (isGenericStop(item.title || "")) continue;
+      jobs.push({
+        query: `${item.title} in ${day.location || trip.destination}`,
+        apply(place) {
+          item.placeId = place.placeId;
+          item.coordinates = place.coordinates;
+          if (place.photoUrl) item.photoUrl = place.photoUrl;
         },
-        body: JSON.stringify({ textQuery: query, maxResultCount: 1 }),
       });
-      if (!res.ok) return null;
-      const data = await res.json();
-      if (!data.places || data.places.length === 0) return null;
-      return data.places[0];
-    } catch (e) {
-      console.error("Maps API error:", e);
-      return null;
     }
   }
 
-  function getPhotoUrl(photoName) {
-    return `https://places.googleapis.com/v1/${photoName}/media?maxHeightPx=800&maxWidthPx=800&key=${apiKey}`;
+  const selected = jobs.slice(0, PLACE_LOOKUP_LIMIT);
+  for (let i = 0; i < selected.length; i++) {
+    const job = selected[i];
+    const place = await searchPlace(job.query);
+    if (place) {
+      place.photoUrl = await wikiPhoto(job.query);
+      job.apply(place);
+    }
+    if (i < selected.length - 1) await sleep(NOMINATIM_GAP_MS);
   }
 
-  // Enrich Hotels
-  if (enrichedTrip.hotels) {
-    await Promise.all(
-      enrichedTrip.hotels.map(async (hotel) => {
-        const place = await searchPlace(`${hotel.name} in ${trip.destination}`);
-        if (place) {
-          hotel.placeId = place.id;
-          if (place.location) hotel.coordinates = { lat: place.location.latitude, lng: place.location.longitude };
-          if (place.formattedAddress) hotel.address = place.formattedAddress;
-          if (place.rating) hotel.realRating = place.rating;
-          if (place.userRatingCount) hotel.reviewsCount = place.userRatingCount;
-          if (place.photos && place.photos.length > 0) hotel.photoUrl = getPhotoUrl(place.photos[0].name);
-        }
-      })
-    );
-  }
-
-  // Enrich Food
-  if (enrichedTrip.food_recommendations) {
-    await Promise.all(
-      enrichedTrip.food_recommendations.map(async (food) => {
-        const place = await searchPlace(`${food.name} in ${trip.destination}`);
-        if (place) {
-          food.placeId = place.id;
-          if (place.location) food.coordinates = { lat: place.location.latitude, lng: place.location.longitude };
-          if (place.rating) food.realRating = place.rating;
-          if (place.priceLevel) food.priceLevel = place.priceLevel;
-          if (place.regularOpeningHours?.openNow !== undefined) {
-            food.openStatus = place.regularOpeningHours.openNow ? "Open Now" : "Closed";
-          }
-          if (place.photos && place.photos.length > 0) food.photoUrl = getPhotoUrl(place.photos[0].name);
-        }
-      })
-    );
-  }
-
-  // Enrich Daily Itinerary
-  if (enrichedTrip.daily_itinerary) {
-    await Promise.all(
-      enrichedTrip.daily_itinerary.map(async (day) => {
-        await Promise.all(
-          day.items.map(async (item) => {
-            const titleLower = item.title.toLowerCase();
-            if (titleLower.includes("lunch") || titleLower.includes("breakfast") || titleLower.includes("dinner") || titleLower.includes("check-in") || titleLower.includes("departure")) {
-              return;
-            }
-            const place = await searchPlace(`${item.title} in ${day.location || trip.destination}`);
-            if (place) {
-              item.placeId = place.id;
-              if (place.location) item.coordinates = { lat: place.location.latitude, lng: place.location.longitude };
-              if (place.photos && place.photos.length > 0) item.photoUrl = getPhotoUrl(place.photos[0].name);
-            }
-          })
-        );
-      })
-    );
-  }
   return enrichedTrip;
 }
 
@@ -260,15 +286,12 @@ app.get("/status/groq", async (req, res) => {
   }
 });
 
-app.get("/status/maps", (req, res) => {
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-  if (!apiKey) return res.json({ configured: false, ok: false, message: "GOOGLE_MAPS_API_KEY missing on backend" });
-  const isLikelyValid = apiKey.startsWith("AIza");
-  return res.json({ configured: true, ok: isLikelyValid, status: isLikelyValid ? 200 : 400 });
+app.get("/status/maps", (_req, res) => {
+  return res.json({ configured: true, ok: true, provider: "openstreetmap", message: "OpenStreetMap" });
 });
 
-app.get("/api-key/maps", (req, res) => {
-  return res.json({ key: process.env.GOOGLE_MAPS_API_KEY || null });
+app.get("/api-key/maps", (_req, res) => {
+  return res.json({ key: null, provider: "openstreetmap" });
 });
 
 app.post("/generate-trip", async (req, res) => {
@@ -334,7 +357,7 @@ app.post("/generate-trip", async (req, res) => {
     }
 
     if (validation && validation.success) {
-      enriched = await enrichTrip(validation.data, process.env.GOOGLE_MAPS_API_KEY || "");
+      enriched = await enrichTrip(validation.data);
       res.json({ ...enriched, _ai_status: aiStatus });
     }
   } catch (error) {

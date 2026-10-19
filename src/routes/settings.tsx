@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Settings as SettingsIcon, CheckCircle2, XCircle, Loader2, Moon, Sun } from "lucide-react";
-import { checkGroqStatus, checkMapsStatus } from "@/lib/trip-generator.functions";
+import { checkGroqStatus } from "@/lib/trip-generator.functions";
 import { useTheme } from "@/lib/theme";
 
 export const Route = createFileRoute("/settings")({
@@ -15,11 +15,8 @@ type Status = "loading" | "connected" | "disconnected" | "error";
 function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const callGroqStatus = useServerFn(checkGroqStatus);
-  const callMapsStatus = useServerFn(checkMapsStatus);
   const [groq, setGroq] = useState<Status>("loading");
   const [groqDetail, setGroqDetail] = useState<string>("Checking…");
-  const [maps, setMaps] = useState<Status>("loading");
-  const [mapsDetail, setMapsDetail] = useState<string>("Checking…");
 
   useEffect(() => {
     (async () => {
@@ -40,22 +37,6 @@ function SettingsPage() {
         setGroqDetail((e as Error).message);
       }
 
-      try {
-        const m = await callMapsStatus();
-        if (!m.configured) {
-          setMaps("disconnected");
-          setMapsDetail("GOOGLE_MAPS_API_KEY missing");
-        } else if (m.ok) {
-          setMaps("connected");
-          setMapsDetail("Configured & Ready");
-        } else {
-          setMaps("error");
-          setMapsDetail("Invalid Key Format");
-        }
-      } catch (e) {
-        setMaps("error");
-        setMapsDetail((e as Error).message);
-      }
     })();
   }, []);
 
@@ -70,11 +51,7 @@ function SettingsPage() {
         <StatusCard label="Groq API" status={groq} detail={groqDetail} />
         <StatusCard label="Backend" status="connected" detail="TanStack Start server" />
         <StatusCard label="Environment" status="connected" detail="Secrets loaded" />
-        <StatusCard
-          label="Google Maps"
-          status={maps}
-          detail={mapsDetail}
-        />
+        <StatusCard label="Map" status="connected" detail="OpenStreetMap • no API key" />
       </div>
 
       <div className="mt-8 glass rounded-2xl p-6">
